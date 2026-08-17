@@ -1,0 +1,10 @@
+{
+  "name": "AushadhFlow - State Medical Supply Chain & Pharmacy Logistics",
+  "description": "Comprehensive statewide healthcare supply chain dashboard with IoT cold-chain telemetry, barcode scanners, AI outbreak surge forecaster, and emergency stock rerouting.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
