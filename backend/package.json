@@ -2,8 +2,12 @@
   "name": "backend",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "migrate": "node src/database/migrate.js",
+    "seed": "node src/database/seed.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -11,11 +15,16 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "better-sqlite3": "^13.0.3",
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^11.8.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.6.2",
     "helmet": "^8.3.0",
+    "joi": "^18.2.3",
+    "jsonwebtoken": "^9.0.3",
+    "uuid": "^14.0.1",
     "winston": "^3.19.0"
   }
 }

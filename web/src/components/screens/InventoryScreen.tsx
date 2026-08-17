@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Search,
   Filter,
@@ -17,6 +17,7 @@ import {
   CheckCircle2,
   FileSpreadsheet,
 } from 'lucide-react';
+import { warehouseApi } from '@/lib/api';
 
 export interface BatchItem {
   id: string;
@@ -178,6 +179,7 @@ export function InventoryScreen({ onOpenOrderModal, onOpenRerouteModal, onOpenBa
   const [selectedTemp, setSelectedTemp] = useState<string>('All');
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [batches, setBatches] = useState<BatchItem[]>(mockBatches);
+  const [loading, setLoading] = useState<boolean>(false);
   const [selectedBatch, setSelectedBatch] = useState<BatchItem | null>(null);
   const [stockAdjustmentModal, setStockAdjustmentModal] = useState<boolean>(false);
   const [adjustAmount, setAdjustAmount] = useState<string>('');
@@ -188,6 +190,53 @@ export function InventoryScreen({ onOpenOrderModal, onOpenRerouteModal, onOpenBa
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
   };
+
+  const fetchLiveInventory = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await warehouseApi.inventory();
+      if (res && res.data && res.data.length > 0) {
+        const mapped: BatchItem[] = res.data.map((item: any) => {
+          const daysExp = item.days_to_expiry ?? 90;
+          let status: BatchItem['status'] = 'optimal';
+          if (item.current_qty < 500) status = 'low_stock';
+          else if (daysExp < 30) status = 'near_expiry';
+          else if (item.status === 'quarantine') status = 'quarantine';
+
+          let storageTemp: BatchItem['storageTemp'] = '15°C to 25°C (Ambient)';
+          if (item.temperature_sensitive) {
+            storageTemp = '2°C to 8°C (Cold Chain)';
+          }
+
+          return {
+            id: item.id,
+            drugName: item.drug_name || 'Generic Medicine',
+            category: (item.category as any) || 'Emergency & IV',
+            batchNo: item.batch_number || 'BATCH-000',
+            manufacturer: item.generic_name || 'Authorized Supplier',
+            mfgDate: item.manufacture_date || 'Jan 2024',
+            expDate: item.expiry_date || 'Dec 2025',
+            daysToExpiry: daysExp,
+            totalStock: item.current_qty || 0,
+            unit: item.unit_price ? 'Units' : 'Doses',
+            storageTemp,
+            warehouseLocation: `${item.warehouse_name || 'Central Hub'} - Bin ${item.location_bin || '01'}`,
+            status,
+            reservedStock: Math.floor((item.current_qty || 0) * 0.1),
+          };
+        });
+        setBatches(mapped);
+      }
+    } catch (err) {
+      console.warn('Could not fetch real inventory, using cached mock data:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchLiveInventory();
+  }, [fetchLiveInventory]);
 
   const filteredBatches = batches.filter((b) => {
     const matchesSearch =
@@ -212,10 +261,23 @@ export function InventoryScreen({ onOpenOrderModal, onOpenRerouteModal, onOpenBa
     return matchesSearch && matchesCategory && matchesTemp && matchesStatus;
   });
 
-  const handleApplyAdjustment = () => {
+  const handleApplyAdjustment = async () => {
     if (!selectedBatch || !adjustAmount) return;
     const qty = parseInt(adjustAmount, 10);
     if (isNaN(qty)) return;
+
+    // Call real API if UUID format
+    try {
+      if (selectedBatch.id && selectedBatch.id.length > 10) {
+        await warehouseApi.stockAdjustment({
+          batch_id: selectedBatch.id,
+          adjustment_qty: qty,
+          reason: adjustReason,
+        });
+      }
+    } catch (err: any) {
+      console.warn('API adjustment notice:', err?.response?.data?.message || err.message);
+    }
 
     setBatches((prev) =>
       prev.map((item) =>

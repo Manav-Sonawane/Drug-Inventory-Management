@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
+const { getAuditLogs } = require('../controllers/auditController');
+const { authenticate, authorize } = require('../middleware/auth');
 
-router.get('/logs', (req, res) => res.json({ message: 'Get audit logs endpoint' }));
-router.get('/logs/:entityType/:entityId', (req, res) => res.json({ message: 'Get entity audit logs endpoint' }));
+router.get('/', authenticate, authorize('ADMIN', 'PROCUREMENT'), getAuditLogs);
 
 module.exports = router;

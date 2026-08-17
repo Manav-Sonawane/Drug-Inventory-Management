@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 
 const dbPath = path.resolve(__dirname, '../../../database.sqlite');
-const db = new Database(dbPath, { verbose: console.log });
+const db = new Database(dbPath);
 
 db.pragma('journal_mode = WAL');
 

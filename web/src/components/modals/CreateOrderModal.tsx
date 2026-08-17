@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   PackagePlus,
@@ -11,8 +11,10 @@ import {
   Calendar,
   Clock,
   ShieldAlert,
+  Building2,
 } from 'lucide-react';
 import { Order, ManifestItem } from '@/lib/types';
+import { procurementApi, drugsApi, adminApi } from '@/lib/api';
 
 interface CreateOrderModalProps {
   isOpen: boolean;
@@ -26,65 +28,105 @@ export default function CreateOrderModal({
   onCreateOrder,
 }: CreateOrderModalProps) {
   const [destination, setDestination] = useState('City Hospital North Wing');
-  const [priority, setPriority] = useState(true);
-  const [slaHours, setSlaHours] = useState('4 hrs remaining');
+  const [selectedVendorId, setSelectedVendorId] = useState('');
+  const [priority, setPriority] = useState(false);
+  const [slaHours, setSlaHours] = useState('24 hrs remaining');
+  const [availableDrugs, setAvailableDrugs] = useState<any[]>([]);
+  const [availableVendors, setAvailableVendors] = useState<any[]>([]);
+  const [availableHospitals, setAvailableHospitals] = useState<any[]>([]);
+
   const [items, setItems] = useState<ManifestItem[]>([
     {
       id: 'item-1',
-      drugName: 'Amoxicillin 500mg Caps',
-      batchNo: 'B-992-X',
-      quantity: 5000,
-      unit: 'Caps',
+      drugName: 'Paracetamol 500mg',
+      batchNo: 'B-7742',
+      quantity: 1000,
+      unit: 'Units',
       status: 'Packed',
-      location: 'Aisle 2, Shelf A',
-    },
-    {
-      id: 'item-2',
-      drugName: 'Ibuprofen 400mg Tabs',
-      batchNo: 'B-104-Y',
-      quantity: 2500,
-      unit: 'Tabs',
-      status: 'Packed',
-      location: 'Aisle 3, Shelf C',
+      location: 'Aisle 1, Shelf B',
     },
   ]);
 
+  const [selectedDrugId, setSelectedDrugId] = useState('');
   const [newDrugName, setNewDrugName] = useState('');
   const [newBatch, setNewBatch] = useState('');
-  const [newQty, setNewQty] = useState(1000);
+  const [newQty, setNewQty] = useState<number>(500);
   const [newUnit, setNewUnit] = useState('Units');
+  const [newUnitPrice, setNewUnitPrice] = useState<number>(10);
   const [submitted, setSubmitted] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    drugsApi.list().then((r) => {
+      if (r?.data && r.data.length > 0) {
+        setAvailableDrugs(r.data);
+        setSelectedDrugId(r.data[0].id);
+        setNewDrugName(r.data[0].name);
+        setNewUnitPrice(r.data[0].unit_price || 10);
+      }
+    }).catch(() => {});
+
+    adminApi.vendors.list().then((r) => {
+      if (r?.data && r.data.length > 0) {
+        setAvailableVendors(r.data);
+        setSelectedVendorId(r.data[0].id);
+      }
+    }).catch(() => {});
+
+    adminApi.hospitals.list().then((r) => {
+      if (r?.data && r.data.length > 0) {
+        setAvailableHospitals(r.data);
+        setDestination(r.data[0].name);
+      }
+    }).catch(() => {});
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
+  const handleDrugSelectChange = (drugId: string) => {
+    setSelectedDrugId(drugId);
+    const d = availableDrugs.find((drug) => drug.id === drugId);
+    if (d) {
+      setNewDrugName(d.name);
+      setNewUnitPrice(d.unit_price || 10);
+      setNewUnit(d.category === 'IV Fluid' ? 'Bottles' : d.category === 'Hormone' ? 'Vials' : 'Units');
+      setNewBatch(`LOT-${d.name.slice(0, 3).toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`);
+    }
+  };
+
   const handleAddItem = () => {
-    if (!newDrugName) return;
+    const finalDrugName = newDrugName || (availableDrugs.find((d) => d.id === selectedDrugId)?.name) || 'Medicine Lot';
+    if (!finalDrugName) return;
+
     setItems([
       ...items,
       {
         id: `item-${Date.now()}`,
-        drugName: newDrugName,
-        batchNo: newBatch || `B-${Math.floor(100 + Math.random() * 900)}`,
-        quantity: newQty,
+        drugName: finalDrugName,
+        batchNo: newBatch || `LOT-${Math.floor(1000 + Math.random() * 9000)}`,
+        quantity: Number(newQty) || 100,
         unit: newUnit,
         status: 'Packed',
-        location: 'Main Aisle 1',
+        location: 'Bay A-1',
       },
     ]);
-    setNewDrugName('');
+
     setNewBatch('');
-    setNewQty(1000);
+    setNewQty(500);
   };
 
   const handleRemoveItem = (id: string) => {
     setItems(items.filter((i) => i.id !== id));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (items.length === 0) return;
 
-    const orderNum = `ORD-2023-${Math.floor(1000 + Math.random() * 9000)}`;
+    const orderNum = `ORD-${Date.now().toString().slice(-6)}`;
+    const totalEstValue = items.reduce((acc, i) => acc + (i.quantity * newUnitPrice), 0);
+
     const newOrder: Order = {
       id: orderNum,
       orderNumber: orderNum,
@@ -93,18 +135,40 @@ export default function CreateOrderModal({
       status: 'Ready for Dispatch',
       priority,
       clearedForDispatch: true,
-      slaLimit: slaHours,
-      totalValue: `₹${(items.reduce((acc, i) => acc + i.quantity * 2.5, 0)).toLocaleString()}`,
+      slaLimit: priority ? '4 hrs remaining' : slaHours,
+      totalValue: `₹${totalEstValue.toLocaleString()}`,
       transportDocStatus: 'Pending Generation',
       manifest: items,
     };
+
+    // Save POs to SQLite backend
+    try {
+      const vendorId = selectedVendorId || (availableVendors[0]?.id);
+      for (const item of items) {
+        let matchingDrug = availableDrugs.find((d) => d.name.toLowerCase() === item.drugName.toLowerCase() || d.id === selectedDrugId);
+        let drugId = matchingDrug ? matchingDrug.id : (availableDrugs[0]?.id);
+
+        if (vendorId && drugId) {
+          await procurementApi.create({
+            vendor_id: vendorId,
+            drug_id: drugId,
+            quantity: item.quantity,
+            unit_price: matchingDrug?.unit_price || newUnitPrice || 10,
+            promised_delivery_date: new Date(Date.now() + 5 * 86400000).toISOString().split('T')[0],
+            notes: `Destination: ${destination} | Batch: ${item.batchNo}`,
+          });
+        }
+      }
+    } catch (err: any) {
+      console.warn('Procurement PO persistence notice:', err?.response?.data?.message || err.message);
+    }
 
     onCreateOrder(newOrder);
     setSubmitted(true);
     setTimeout(() => {
       setSubmitted(false);
       onClose();
-    }, 1200);
+    }, 1000);
   };
 
   return (
@@ -136,12 +200,12 @@ export default function CreateOrderModal({
             </div>
             <h4 className="text-xl font-bold text-slate-900">Order Manifest Created!</h4>
             <p className="text-sm text-slate-600">
-              Order dispatched for destination: {destination} with {items.length} line items.
+              Order dispatched for destination: <span className="font-semibold text-slate-900">{destination}</span> with {items.length} line item(s).
             </p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="p-5 space-y-5 overflow-y-auto flex-1 text-sm">
-            {/* Destination & Priority */}
+            {/* Destination & Vendor */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
@@ -152,33 +216,55 @@ export default function CreateOrderModal({
                   onChange={(e) => setDestination(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-800 focus:outline-none text-sm font-medium"
                 >
-                  <option value="City Hospital North Wing">City Hospital North Wing</option>
-                  <option value="Primary Health Centre, Malda">Primary Health Centre, Malda</option>
-                  <option value="Central City Hospital">Central City Hospital</option>
-                  <option value="West Valley Medical Center">West Valley Medical Center</option>
-                  <option value="Siliguri Regional Medical Unit">Siliguri Regional Medical Unit</option>
+                  {availableHospitals.map((h) => (
+                    <option key={h.id} value={h.name}>{h.name}</option>
+                  ))}
+                  {availableHospitals.length === 0 && (
+                    <>
+                      <option value="City Hospital North Wing">City Hospital North Wing</option>
+                      <option value="Primary Health Centre, Malda">Primary Health Centre, Malda</option>
+                      <option value="District Alpha Medical Complex">District Alpha Medical Complex</option>
+                      <option value="Siliguri Regional Depot">Siliguri Regional Depot</option>
+                    </>
+                  )}
                 </select>
               </div>
 
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-                  Delivery Urgency & SLA
+                  Supply Vendor Partner
                 </label>
-                <div className="flex items-center gap-3 mt-1.5">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={priority}
-                      onChange={(e) => setPriority(e.target.checked)}
-                      className="w-4 h-4 text-blue-900 rounded focus:ring-blue-800 border-slate-300"
-                    />
-                    <span className="text-xs font-bold text-blue-900 bg-blue-100 px-2 py-0.5 rounded">
-                      High Priority
-                    </span>
-                  </label>
-                  <span className="text-xs text-slate-500 font-mono">SLA: 4 Hours</span>
-                </div>
+                <select
+                  value={selectedVendorId}
+                  onChange={(e) => setSelectedVendorId(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-800 focus:outline-none text-sm font-medium"
+                >
+                  {availableVendors.map((v) => (
+                    <option key={v.id} value={v.id}>{v.name}</option>
+                  ))}
+                  {availableVendors.length === 0 && (
+                    <option value="">MediEquip Global</option>
+                  )}
+                </select>
               </div>
+            </div>
+
+            {/* Priority & SLA */}
+            <div className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-200">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={priority}
+                  onChange={(e) => setPriority(e.target.checked)}
+                  className="w-4 h-4 text-blue-900 rounded focus:ring-blue-800 border-slate-300"
+                />
+                <span className="text-xs font-bold text-slate-800">
+                  Mark as Priority Rush Delivery
+                </span>
+              </label>
+              <span className="text-xs font-mono text-slate-500 bg-white px-2.5 py-1 rounded border border-slate-200">
+                SLA: {priority ? '4 Hours (Rush)' : slaHours}
+              </span>
             </div>
 
             {/* Manifest Items List */}
@@ -209,7 +295,7 @@ export default function CreateOrderModal({
                           {item.quantity.toLocaleString()} {item.unit}
                         </td>
                         <td className="p-2.5 text-right">
-                          <span className="bg-blue-50 text-blue-800 font-bold px-2 py-0.5 rounded text-[11px]">
+                          <span className="bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded text-[11px]">
                             {item.status}
                           </span>
                         </td>
@@ -230,36 +316,50 @@ export default function CreateOrderModal({
             </div>
 
             {/* Add Item Row */}
-            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
-              <p className="text-xs font-semibold text-slate-700">Add Manifest Item:</p>
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
-                <input
-                  type="text"
-                  placeholder="Drug Name (e.g. Saline IV 500ml)"
-                  value={newDrugName}
-                  onChange={(e) => setNewDrugName(e.target.value)}
-                  className="sm:col-span-2 bg-white border border-slate-200 rounded-lg p-2 text-xs text-slate-900 focus:ring-1 focus:ring-blue-800 focus:outline-none"
-                />
-                <input
-                  type="text"
-                  placeholder="Batch (e.g. B-502)"
-                  value={newBatch}
-                  onChange={(e) => setNewBatch(e.target.value)}
-                  className="bg-white border border-slate-200 rounded-lg p-2 text-xs text-slate-900 focus:ring-1 focus:ring-blue-800 focus:outline-none font-mono"
-                />
-                <div className="flex gap-1">
+            <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2.5">
+              <p className="text-xs font-semibold text-slate-700">Add Item to Manifest:</p>
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                <div className="sm:col-span-5">
+                  <select
+                    value={selectedDrugId}
+                    onChange={(e) => handleDrugSelectChange(e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs text-slate-900 focus:ring-1 focus:ring-blue-800 font-medium"
+                  >
+                    {availableDrugs.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name} (₹{d.unit_price || 10})
+                      </option>
+                    ))}
+                    <option value="custom">+ Custom Entry</option>
+                  </select>
+                </div>
+
+                <div className="sm:col-span-3">
+                  <input
+                    type="text"
+                    placeholder="Batch (e.g. B-902)"
+                    value={newBatch}
+                    onChange={(e) => setNewBatch(e.target.value)}
+                    className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs text-slate-900 focus:ring-1 focus:ring-blue-800 font-mono"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
                   <input
                     type="number"
                     min="1"
                     placeholder="Qty"
                     value={newQty}
                     onChange={(e) => setNewQty(parseInt(e.target.value) || 100)}
-                    className="w-20 bg-white border border-slate-200 rounded-lg p-2 text-xs text-slate-900 focus:ring-1 focus:ring-blue-800 focus:outline-none font-semibold"
+                    className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs text-slate-900 focus:ring-1 focus:ring-blue-800 font-semibold"
                   />
+                </div>
+
+                <div className="sm:col-span-2">
                   <button
                     type="button"
                     onClick={handleAddItem}
-                    className="flex-1 bg-blue-900 text-white rounded-lg p-2 text-xs font-semibold hover:bg-blue-800 flex items-center justify-center gap-1"
+                    className="w-full bg-[#00236f] text-white rounded-lg p-2 text-xs font-semibold hover:bg-blue-900 flex items-center justify-center gap-1 shadow-xs"
                   >
                     <Plus className="w-3.5 h-3.5" /> Add
                   </button>

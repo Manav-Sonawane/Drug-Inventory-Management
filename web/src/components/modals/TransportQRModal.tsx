@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import {
   X,
   QrCode,
@@ -12,7 +12,12 @@ import {
   Building,
   Calendar,
   Layers,
+  ExternalLink,
+  Smartphone,
 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import { Order } from '@/lib/types';
 import Logo from '@/components/Logo';
 
@@ -29,14 +34,58 @@ export default function TransportQRModal({
   order,
   onConfirmDispatch,
 }: TransportQRModalProps) {
+  const printDocRef = useRef<HTMLDivElement>(null);
+  const [downloading, setDownloading] = useState(false);
+
   if (!isOpen || !order) return null;
+
+  const securityHash = '0x' + Array.from(order.orderNumber || 'ORD')
+    .reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0)
+    .toString(16)
+    .toUpperCase()
+    .padStart(8, '0');
+
+  // Clean, short URL that any phone camera instantly recognizes:
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const qrReceiptUrl = `${origin}/?receipt=${encodeURIComponent(order.orderNumber)}`;
+
+  const handleDownloadPDF = async () => {
+    if (!printDocRef.current) return;
+    setDownloading(true);
+    try {
+      const element = printDocRef.current;
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+      });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+
+      const imgProps = pdf.getImageProperties(imgData);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`Waybill-Receipt-${order.orderNumber}.pdf`);
+    } catch (err) {
+      console.error('PDF generation failed:', err);
+      window.print();
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   const handlePrint = () => {
     window.print();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs animate-in fade-in duration-200">
       <div className="bg-white rounded-2xl w-full max-w-xl overflow-hidden shadow-2xl border border-slate-200 flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="bg-[#00236f] text-white p-4 flex items-center justify-between">
@@ -57,7 +106,7 @@ export default function TransportQRModal({
 
         {/* Printable Pass Container */}
         <div className="p-6 overflow-y-auto space-y-5 text-sm bg-slate-50/50">
-          <div className="bg-white rounded-xl p-5 border-2 border-slate-800 shadow-sm relative">
+          <div ref={printDocRef} className="bg-white rounded-xl p-5 border-2 border-slate-800 shadow-sm relative">
             {/* Stamp / Clearance Ribbon */}
             <div className="absolute top-4 right-4 bg-emerald-50 text-emerald-800 border border-emerald-300 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 shadow-xs">
               <ShieldCheck className="w-4 h-4 text-emerald-600" />
@@ -87,56 +136,45 @@ export default function TransportQRModal({
               </div>
             </div>
 
-            {/* Scannable SVG QR Code Graphic */}
-            <div className="my-5 p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col sm:flex-row items-center gap-4 justify-between">
-              <div className="w-32 h-32 bg-white p-2 border-2 border-slate-900 rounded-lg shrink-0 flex items-center justify-center shadow-xs">
-                {/* Authentic QR Pattern SVG */}
-                <svg viewBox="0 0 100 100" className="w-full h-full text-slate-900 fill-current">
-                  <rect x="0" y="0" width="30" height="30" rx="2" />
-                  <rect x="5" y="5" width="20" height="20" fill="white" />
-                  <rect x="10" y="10" width="10" height="10" />
-
-                  <rect x="70" y="0" width="30" height="30" rx="2" />
-                  <rect x="75" y="5" width="20" height="20" fill="white" />
-                  <rect x="80" y="10" width="10" height="10" />
-
-                  <rect x="0" y="70" width="30" height="30" rx="2" />
-                  <rect x="5" y="75" width="20" height="20" fill="white" />
-                  <rect x="10" y="80" width="10" height="10" />
-
-                  {/* QR Data Matrix Bits */}
-                  <rect x="36" y="10" width="8" height="8" />
-                  <rect x="50" y="15" width="8" height="8" />
-                  <rect x="36" y="28" width="8" height="8" />
-                  <rect x="50" y="32" width="8" height="8" />
-                  <rect x="12" y="44" width="8" height="8" />
-                  <rect x="26" y="48" width="8" height="8" />
-                  <rect x="42" y="48" width="16" height="8" />
-                  <rect x="68" y="42" width="8" height="16" />
-                  <rect x="84" y="46" width="8" height="8" />
-                  <rect x="42" y="66" width="8" height="8" />
-                  <rect x="56" y="66" width="16" height="8" />
-                  <rect x="78" y="72" width="12" height="12" />
-                  <rect x="44" y="84" width="12" height="8" />
-                </svg>
+            {/* High-Contrast Fast-Scan QR Code Section */}
+            <div className="my-5 p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-col sm:flex-row items-center gap-5 justify-between">
+              {/* High Contrast Clean QR */}
+              <div className="w-44 h-44 bg-white p-3 border-2 border-slate-900 rounded-2xl shrink-0 flex items-center justify-center shadow-md">
+                <QRCodeSVG
+                  value={qrReceiptUrl}
+                  size={152}
+                  level="L"
+                  includeMargin={false}
+                  className="w-full h-full"
+                />
               </div>
 
-              <div className="text-xs space-y-1.5 flex-1">
+              <div className="text-xs space-y-2 flex-1">
                 <div className="flex justify-between">
                   <span className="text-slate-500">Security Hash:</span>
-                  <span className="font-mono text-slate-800 font-semibold">0x7F9B...4C82</span>
+                  <span className="font-mono text-slate-800 font-bold">{securityHash}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Items Manifested:</span>
-                  <span className="font-semibold text-slate-800">{order.manifest.length} Medical SKUs</span>
+                  <span className="font-semibold text-slate-800">{order.manifest.length} Medical SKU(s)</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Carrier Vehicle:</span>
                   <span className="font-medium text-slate-800">WB-74-AX-9912 (Refrigerated)</span>
                 </div>
-                <p className="text-[11px] text-slate-500 pt-1 border-t border-slate-200">
-                  Recipient Health Centre pharmacist can scan this QR code on arrival to automatically confirm inventory receipt.
-                </p>
+
+                <div className="bg-emerald-50 border border-emerald-300 p-2.5 rounded-xl text-[11px] text-emerald-900 font-medium space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold text-emerald-800">
+                    <Smartphone className="w-4 h-4 text-emerald-600" />
+                    <span>Instant Phone Scanner Link:</span>
+                  </div>
+                  <div className="font-mono text-[10px] text-slate-600 truncate">
+                    {qrReceiptUrl}
+                  </div>
+                  <p className="text-[10px] text-emerald-700">
+                    Point camera directly at the code above to open & download the PDF receipt.
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -161,18 +199,29 @@ export default function TransportQRModal({
         </div>
 
         {/* Footer Actions */}
-        <div className="p-4 bg-white border-t border-slate-200 flex items-center justify-between gap-3">
-          <button
-            onClick={handlePrint}
-            className="px-4 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors flex items-center gap-1.5"
-          >
-            <Printer className="w-4 h-4 text-slate-600" />
-            Print Shipping Doc
-          </button>
+        <div className="p-4 bg-white border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex gap-2">
+            <button
+              onClick={handlePrint}
+              className="px-3.5 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors flex items-center gap-1.5"
+            >
+              <Printer className="w-4 h-4 text-slate-600" />
+              Print
+            </button>
+            <button
+              onClick={handleDownloadPDF}
+              disabled={downloading}
+              className="px-3.5 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center gap-1.5 shadow-xs"
+            >
+              <Download className="w-4 h-4" />
+              {downloading ? 'Generating...' : 'Download PDF'}
+            </button>
+          </div>
+
           <div className="flex gap-2">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800"
+              className="px-3.5 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800"
             >
               Close
             </button>
@@ -181,7 +230,7 @@ export default function TransportQRModal({
                 onConfirmDispatch(order.id);
                 onClose();
               }}
-              className="px-5 py-2.5 bg-[#00236f] text-white font-semibold text-xs rounded-lg hover:bg-blue-900 transition-colors shadow-sm flex items-center gap-2"
+              className="px-4 py-2 bg-[#00236f] text-white font-semibold text-xs rounded-lg hover:bg-blue-900 transition-colors shadow-sm flex items-center gap-1.5"
             >
               <Truck className="w-4 h-4" />
               Authorize & Mark Shipped

@@ -14,6 +14,7 @@ import {
   HeartPulse,
   Sparkles,
   Snowflake,
+  ClipboardList,
 } from 'lucide-react';
 import { UserRole } from '@/lib/types';
 import Logo from './Logo';
@@ -44,6 +45,7 @@ export default function SidebarNav({
     { id: 'warehouses', label: 'Warehouses & Cold Chain', icon: Building },
     { id: 'partners', label: 'Partners', icon: Handshake },
     { id: 'reports', label: 'Reports', icon: BarChart3 },
+    { id: 'audit', label: 'Audit Log', icon: ClipboardList },
   ];
 
   return (

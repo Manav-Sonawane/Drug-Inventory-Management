@@ -1,10 +1,12 @@
 const express = require('express');
 const router = express.Router();
+const { getDashboardKPIs, getStockoutFrequency, getVendorPerformance, getExpiryWaste, getProcurementEfficiency } = require('../controllers/analyticsController');
+const { authenticate } = require('../middleware/auth');
 
-router.get('/dashboard', (req, res) => res.json({ message: 'Dashboard KPIs endpoint' }));
-router.get('/stockout-frequency', (req, res) => res.json({ message: 'Stockout frequency endpoint' }));
-router.get('/vendor-performance', (req, res) => res.json({ message: 'Vendor performance endpoint' }));
-router.get('/expiry-waste', (req, res) => res.json({ message: 'Expiry waste endpoint' }));
-router.get('/procurement-efficiency', (req, res) => res.json({ message: 'Procurement efficiency endpoint' }));
+router.get('/dashboard', authenticate, getDashboardKPIs);
+router.get('/stockout-frequency', authenticate, getStockoutFrequency);
+router.get('/vendor-performance', authenticate, getVendorPerformance);
+router.get('/expiry-waste', authenticate, getExpiryWaste);
+router.get('/procurement-efficiency', authenticate, getProcurementEfficiency);
 
 module.exports = router;

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   FileText,
@@ -12,6 +12,8 @@ import {
   Plus,
 } from 'lucide-react';
 import { ConsumptionLog, LowStockAlert } from '@/lib/types';
+import { warehouseApi, adminApi } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface LogConsumptionModalProps {
   isOpen: boolean;
@@ -26,33 +28,66 @@ export default function LogConsumptionModal({
   onAddConsumption,
   stockList = [],
 }: LogConsumptionModalProps) {
+  const { user } = useAuth();
   const [wardName, setWardName] = useState('Maternity Ward');
   const [selectedDrug, setSelectedDrug] = useState('Oxytocin Injection');
   const [batchNo, setBatchNo] = useState('OXY-902');
+  const [selectedBatchId, setSelectedBatchId] = useState<string>('');
   const [quantity, setQuantity] = useState<number>(10);
   const [unit, setUnit] = useState('Ampoules');
   const [requestedBy, setRequestedBy] = useState('Dr. Sharma');
   const [issuedBy, setIssuedBy] = useState('Pharmacist on Duty');
   const [notes, setNotes] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [hospitals, setHospitals] = useState<any[]>([]);
+  const [selectedHospitalId, setSelectedHospitalId] = useState<string>('');
 
-  if (!isOpen) return null;
+  const [drugOptions, setDrugOptions] = useState([
+    { id: '', name: 'Oxytocin Injection', batch: 'OXY-902', unit: 'Ampoules', current: 45 },
+    { id: '', name: 'Paracetamol 500mg (Tab)', batch: 'B-7742', unit: 'Tabs', current: 15 },
+    { id: '', name: 'Saline IV Fluid (500ml)', batch: 'IV-091', unit: 'Bottles', current: 42 },
+    { id: '', name: 'Amoxicillin 250mg (Cap)', batch: 'AX-112', unit: 'Caps', current: 100 },
+    { id: '', name: 'Gauze Rolls', batch: 'GZ-332', unit: 'Rolls', current: 200 },
+    { id: '', name: 'Surgical Tape 1-inch', batch: 'ST-101', unit: 'Packs', current: 80 },
+    { id: '', name: 'Insulin Glargine 100IU/ml', batch: 'C-112', unit: 'Vials', current: 8 },
+  ]);
 
-  const drugOptions = [
-    { name: 'Oxytocin Injection', batch: 'OXY-902', unit: 'Ampoules', current: 45 },
-    { name: 'Paracetamol 500mg (Tab)', batch: 'B-7742', unit: 'Tabs', current: 15 },
-    { name: 'Saline IV Fluid (500ml)', batch: 'IV-091', unit: 'Bottles', current: 42 },
-    { name: 'Amoxicillin 250mg (Cap)', batch: 'AX-112', unit: 'Caps', current: 100 },
-    { name: 'Gauze Rolls', batch: 'GZ-332', unit: 'Rolls', current: 200 },
-    { name: 'Surgical Tape 1-inch', batch: 'ST-101', unit: 'Packs', current: 80 },
-    { name: 'Insulin Glargine 100IU/ml', batch: 'C-112', unit: 'Vials', current: 8 },
-  ];
+  useEffect(() => {
+    if (!isOpen) return;
+
+    warehouseApi.inventory().then((res) => {
+      if (res && res.data && res.data.length > 0) {
+        const mapped = res.data.map((b: any) => ({
+          id: b.id,
+          name: b.drug_name,
+          batch: b.batch_number,
+          unit: b.unit_price ? 'Units' : 'Doses',
+          current: b.current_qty,
+        }));
+        setDrugOptions(mapped);
+        if (mapped[0]) {
+          setSelectedDrug(mapped[0].name);
+          setBatchNo(mapped[0].batch);
+          setSelectedBatchId(mapped[0].id);
+          setUnit(mapped[0].unit);
+        }
+      }
+    }).catch(() => {});
+
+    adminApi.hospitals.list().then((res) => {
+      if (res && res.data && res.data.length > 0) {
+        setHospitals(res.data);
+        setSelectedHospitalId(user?.hospital_id || res.data[0].id);
+      }
+    }).catch(() => {});
+  }, [isOpen, user]);
 
   const handleDrugChange = (drugName: string) => {
     setSelectedDrug(drugName);
     const found = drugOptions.find((d) => d.name === drugName);
     if (found) {
       setBatchNo(found.batch);
+      setSelectedBatchId(found.id);
       setUnit(found.unit);
     }
   };
@@ -69,7 +104,7 @@ export default function LogConsumptionModal({
       'General Medicine': 'local_hospital',
     };
 
-    const newLog: ConsumptionLog = {
+    const newLog: ConsumptionLog & { batch_id?: string; hospital_id?: string } = {
       id: `LOG-${Date.now()}`,
       wardName,
       icon: iconMap[wardName] || 'local_hospital',
@@ -77,6 +112,8 @@ export default function LogConsumptionModal({
       items: [{ name: selectedDrug, quantity, unit }],
       requestedBy: requestedBy || 'Duty Officer',
       issuedBy: issuedBy || 'Admin',
+      batch_id: selectedBatchId || undefined,
+      hospital_id: selectedHospitalId || undefined,
     };
 
     onAddConsumption(newLog);
@@ -86,6 +123,8 @@ export default function LogConsumptionModal({
       onClose();
     }, 1200);
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200">

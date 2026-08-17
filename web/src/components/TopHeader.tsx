@@ -14,9 +14,11 @@ import {
   ShieldCheck,
   RefreshCw,
   Sparkles,
+  LogOut,
 } from 'lucide-react';
 import { UserRole } from '@/lib/types';
 import Logo from './Logo';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface TopHeaderProps {
   currentRole: UserRole;
@@ -35,6 +37,7 @@ export default function TopHeader({
   onOpenTelemetryModal,
   onOpenAiAdvisor,
 }: TopHeaderProps) {
+  const { user, logout } = useAuth();
   const roleLabels: Record<UserRole, { title: string; subtitle: string; badge: string; icon: any }> = {
     super_admin: {
       title: 'State Health Directorate',
@@ -211,24 +214,19 @@ export default function TopHeader({
             </div>
             <div className="hidden lg:block text-left">
               <p className="text-xs font-bold text-slate-900 leading-tight">
-                {currentRole === 'super_admin'
-                  ? 'Dr. Rajesh Sen'
-                  : currentRole === 'phc_clinic'
-                  ? 'Dr. S. Sharma'
-                  : currentRole === 'warehouse'
-                  ? 'Logistics Dispatch'
-                  : 'Vendor Admin'}
+                {user?.full_name || 'User'}
               </p>
               <p className="text-[10px] text-slate-500">
-                {currentRole === 'super_admin'
-                  ? 'State Health Officer'
-                  : currentRole === 'phc_clinic'
-                  ? 'Medical Officer'
-                  : currentRole === 'warehouse'
-                  ? 'Bay Incharge'
-                  : 'PharmaCorp Ltd'}
+                {user?.role || currentRole}
               </p>
             </div>
+            <button
+              onClick={logout}
+              title="Sign out"
+              className="ml-1 p-1.5 rounded-full hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </div>

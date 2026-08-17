@@ -1,0 +1,10 @@
+{"level":"error","message":"500 - Cannot read properties of undefined (reading 'count') - /api/audit?limit=25&offset=0 - GET - ::1","timestamp":"2026-08-17T19:10:18.258Z"}
+{"level":"error","message":"500 - Cannot read properties of undefined (reading 'count') - /api/audit?limit=25&offset=0 - GET - ::1","timestamp":"2026-08-17T19:10:18.345Z"}
+{"level":"error","message":"500 - Cannot read properties of undefined (reading 'count') - /api/audit?entity_type=drug&limit=25&offset=0 - GET - ::1","timestamp":"2026-08-17T19:10:40.969Z"}
+{"level":"error","message":"500 - Cannot read properties of undefined (reading 'count') - /api/audit?limit=25&offset=0 - GET - ::1","timestamp":"2026-08-17T19:10:43.203Z"}
+{"level":"error","message":"500 - Cannot read properties of undefined (reading 'count') - /api/audit?limit=25&offset=0 - GET - ::1","timestamp":"2026-08-17T19:11:38.593Z"}
+{"level":"error","message":"500 - Cannot read properties of undefined (reading 'count') - /api/audit?limit=25&offset=0 - GET - ::1","timestamp":"2026-08-17T19:11:38.660Z"}
+{"level":"error","message":"500 - Cannot read properties of undefined (reading 'count') - /api/audit?limit=25&offset=0 - GET - ::1","timestamp":"2026-08-17T19:11:50.316Z"}
+{"level":"error","message":"500 - Cannot read properties of undefined (reading 'count') - /api/audit?limit=25&offset=0 - GET - ::1","timestamp":"2026-08-17T19:11:50.429Z"}
+{"level":"error","message":"500 - Cannot read properties of undefined (reading 'count') - /api/audit?limit=25&offset=0 - GET - ::1","timestamp":"2026-08-17T19:20:11.981Z"}
+{"level":"error","message":"500 - Cannot read properties of undefined (reading 'count') - /api/audit?limit=25&offset=0 - GET - ::1","timestamp":"2026-08-17T19:20:12.061Z"}

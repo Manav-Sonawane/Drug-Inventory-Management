@@ -1,10 +1,14 @@
 const express = require('express');
 const router = express.Router();
+const { listOrders, getOrder, getPublicOrder, createOrder, approveOrder, rejectOrder } = require('../controllers/procurementController');
+const { authenticate } = require('../middleware/auth');
+const { validate, schemas } = require('../middleware/validate');
 
-router.get('/', (req, res) => res.json({ message: 'List purchase orders endpoint' }));
-router.get('/:id', (req, res) => res.json({ message: 'Get PO detail endpoint' }));
-router.post('/', (req, res) => res.json({ message: 'Create PO endpoint' }));
-router.put('/:id/approve', (req, res) => res.json({ message: 'Approve PO endpoint' }));
-router.put('/:id/reject', (req, res) => res.json({ message: 'Reject PO endpoint' }));
+router.get('/public/:identifier', getPublicOrder);
+router.get('/', authenticate, listOrders);
+router.get('/:id', authenticate, getOrder);
+router.post('/', authenticate, validate(schemas.createOrder), createOrder);
+router.put('/:id/approve', authenticate, approveOrder);
+router.put('/:id/reject', authenticate, validate(schemas.rejectOrder), rejectOrder);
 
 module.exports = router;

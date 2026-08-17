@@ -10,4 +10,21 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  server: {
+    host: true,
+    allowedHosts: [
+      'alessandro-necessitous-leandro.ngrok-free.dev',
+      '.ngrok-free.dev',
+      '.ngrok.io',
+      '.ngrok-free.app',
+      'localhost',
+    ],
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+  },
 })

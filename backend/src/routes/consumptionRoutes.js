@@ -1,8 +1,11 @@
 const express = require('express');
 const router = express.Router();
+const { logConsumption, getHospitalConsumption, getConsumptionTrends } = require('../controllers/consumptionController');
+const { authenticate } = require('../middleware/auth');
+const { validate, schemas } = require('../middleware/validate');
 
-router.post('/log', (req, res) => res.json({ message: 'Log consumption endpoint' }));
-router.get('/hospital/:hospitalId', (req, res) => res.json({ message: 'Get consumption history endpoint' }));
-router.get('/trends', (req, res) => res.json({ message: 'Get consumption trends endpoint' }));
+router.post('/log', authenticate, validate(schemas.logConsumption), logConsumption);
+router.get('/hospital/:hospitalId', authenticate, getHospitalConsumption);
+router.get('/trends', authenticate, getConsumptionTrends);
 
 module.exports = router;

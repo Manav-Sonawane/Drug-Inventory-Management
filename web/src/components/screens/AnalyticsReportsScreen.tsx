@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   TrendingUp,
   Download,
@@ -14,7 +14,9 @@ import {
   ArrowDownRight,
   Filter,
   BarChart3,
+  RefreshCw,
 } from 'lucide-react';
+import { analyticsApi } from '@/lib/api';
 
 interface AnalyticsReportsScreenProps {
   onOpenExportModal: () => void;
@@ -23,11 +25,20 @@ interface AnalyticsReportsScreenProps {
 export function AnalyticsReportsScreen({ onOpenExportModal }: AnalyticsReportsScreenProps) {
   const [timeRange, setTimeRange] = useState<string>('30d');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [kpis, setKpis] = useState<any>(null);
+  const [loadingKpis, setLoadingKpis] = useState(true);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
   };
+
+  useEffect(() => {
+    analyticsApi.dashboard()
+      .then((res) => setKpis(res?.data))
+      .catch(() => {})
+      .finally(() => setLoadingKpis(false));
+  }, []);
 
   // Mock trend data
   const weeklyConsumption = [
@@ -100,6 +111,30 @@ export function AnalyticsReportsScreen({ onOpenExportModal }: AnalyticsReportsSc
             <span>Export Official PDF Report</span>
           </button>
         </div>
+      </div>
+
+      {/* ── Live Backend KPI Bar ──────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        {[
+          { label: 'Registered Drugs', value: kpis?.drug_count, icon: Package, color: 'text-blue-700', bg: 'bg-blue-50' },
+          { label: 'Low Stock Alerts', value: kpis?.low_stock_count, icon: AlertTriangle, color: 'text-amber-700', bg: 'bg-amber-50' },
+          { label: 'Active Batches', value: kpis?.batch_count, icon: BarChart3, color: 'text-emerald-700', bg: 'bg-emerald-50' },
+          { label: 'Pending Orders', value: kpis?.pending_po_count, icon: Activity, color: 'text-purple-700', bg: 'bg-purple-50' },
+        ].map((k) => (
+          <div key={k.label} className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center gap-3 shadow-sm">
+            <div className={`w-10 h-10 rounded-xl ${k.bg} flex items-center justify-center shrink-0`}>
+              <k.icon className={`w-5 h-5 ${k.color}`} />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-slate-900">
+                {loadingKpis ? (
+                  <span className="inline-block w-10 h-6 bg-slate-100 rounded animate-pulse" />
+                ) : (k.value ?? '—')}
+              </p>
+              <p className="text-[11px] text-slate-500 font-medium">{k.label}</p>
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Top Level Metric KPIs */}
