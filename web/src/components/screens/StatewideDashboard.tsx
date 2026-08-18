@@ -33,6 +33,8 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { HeatmapNode, UrgentAlert, Vendor } from '@/lib/types';
+import { Map as MapCNMap, MapMarker, MapRoute, MAP_STYLES } from '@/components/ui/map';
+
 
 interface StatewideDashboardProps {
   onOpenReroute: (alertTitle?: string) => void;
@@ -108,10 +110,47 @@ export default function StatewideDashboard({
   const [vendorFilter, setVendorFilter] = useState('');
   const [mapFilter, setMapFilter] = useState<'all' | 'critical' | 'warning' | 'optimal'>('all');
   const [mapLayer, setMapLayer] = useState<'network' | 'coldchain' | 'fleet' | 'surge'>('network');
+  const [mapEngine, setMapEngine] = useState<'mapcn' | 'svg'>('mapcn');
+  const [mapTheme, setMapTheme] = useState<'dark' | 'light' | 'voyager'>('dark');
   const [selectedNode, setSelectedNode] = useState<HeatmapNode | null>(null);
   const [selectedVehicle, setSelectedVehicle] = useState<MovingVehicle | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [mapSearch, setMapSearch] = useState('');
+
+  const facilityGeoCoords: Record<string, [number, number]> = {
+    'NODE-1': [88.3500, 24.8000],
+    'NODE-2': [88.1402, 25.0108],
+    'NODE-3': [88.2618, 24.1818],
+    'NODE-4': [88.4276, 26.1271],
+    'NODE-5': [88.4276, 26.7271],
+    'NODE-6': [86.9842, 23.6889],
+    'NODE-7': [88.3639, 22.5726],
+  };
+
+  const vehicleGeoCoords: Record<string, [number, number]> = {
+    'VEH-01': [88.2200, 24.3000],
+    'VEH-02': [88.3800, 26.1000],
+    'VEH-03': [87.3000, 23.5000],
+  };
+
+  const nh12Route: [number, number][] = [
+    [88.3639, 22.5726],
+    [88.2618, 24.1818],
+    [88.1402, 25.0108],
+    [88.4276, 26.7271],
+  ];
+
+  const nh19Route: [number, number][] = [
+    [88.3639, 22.5726],
+    [87.3262, 22.3460],
+    [86.9842, 23.6889],
+  ];
+
+  const foothillsRoute: [number, number][] = [
+    [88.4276, 26.7271],
+    [88.4276, 26.1271],
+  ];
+
 
   const filteredVendors = vendors.filter((v) =>
     v.name.toLowerCase().includes(vendorFilter.toLowerCase())
@@ -248,6 +287,55 @@ export default function StatewideDashboard({
 
             {/* Layer & Filter Buttons */}
             <div className="flex flex-wrap items-center gap-2 text-xs">
+              {/* Map Engine Selector */}
+              <div className="flex bg-slate-200/80 p-0.5 rounded-lg border border-slate-300">
+                <button
+                  onClick={() => setMapEngine('mapcn')}
+                  className={`px-2 py-1 rounded-md text-[11px] font-bold transition-all ${
+                    mapEngine === 'mapcn' ? 'bg-[#00236f] text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  🗺️ MapCN Vector
+                </button>
+                <button
+                  onClick={() => setMapEngine('svg')}
+                  className={`px-2 py-1 rounded-md text-[11px] font-bold transition-all ${
+                    mapEngine === 'svg' ? 'bg-[#00236f] text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Tactical SVG
+                </button>
+              </div>
+
+              {mapEngine === 'mapcn' && (
+                <div className="flex bg-slate-200/80 p-0.5 rounded-lg border border-slate-300">
+                  <button
+                    onClick={() => setMapTheme('dark')}
+                    className={`px-2 py-1 rounded-md text-[10px] font-semibold transition-all ${
+                      mapTheme === 'dark' ? 'bg-slate-900 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    🌙 Dark
+                  </button>
+                  <button
+                    onClick={() => setMapTheme('light')}
+                    className={`px-2 py-1 rounded-md text-[10px] font-semibold transition-all ${
+                      mapTheme === 'light' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    ☀️ Light
+                  </button>
+                  <button
+                    onClick={() => setMapTheme('voyager')}
+                    className={`px-2 py-1 rounded-md text-[10px] font-semibold transition-all ${
+                      mapTheme === 'voyager' ? 'bg-blue-600 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    🗺️ Voyager
+                  </button>
+                </div>
+              )}
+
               <div className="flex bg-slate-200/80 p-0.5 rounded-lg">
                 <button
                   onClick={() => setMapLayer('network')}
@@ -314,11 +402,134 @@ export default function StatewideDashboard({
             </div>
           </div>
 
+
           {/* Interactive GIS Stage */}
-          <div className="flex-1 relative bg-[#0b132b] overflow-hidden select-none min-h-[420px]">
-            {/* Topographic GIS Vector Canvas */}
-            <svg
-              className="absolute inset-0 w-full h-full"
+          <div className="flex-1 relative bg-[#0b132b] overflow-hidden select-none min-h-[480px]">
+            {mapEngine === 'mapcn' ? (
+              <div className="w-full h-full min-h-[480px] relative">
+                <MapCNMap theme={mapTheme} center={[88.2000, 24.5000]} zoom={7.2} pitch={30}>
+                  {/* Highway & Cold Corridor Routes */}
+                  <MapRoute id="nh-12" coordinates={nh12Route} color="#0284c7" width={4} dashed={mapLayer === 'coldchain'} />
+                  <MapRoute id="nh-19" coordinates={nh19Route} color="#6366f1" width={3.5} />
+                  <MapRoute id="foothills" coordinates={foothillsRoute} color="#3b82f6" width={2.5} dashed />
+
+                  {/* Regional Geographic Overlay Labels */}
+                  <MapMarker longitude={88.4276} latitude={26.8500} className="pointer-events-none">
+                    <span className="text-[10px] font-bold text-cyan-400 bg-slate-950/80 px-2 py-0.5 rounded border border-cyan-500/40 tracking-wider shadow-lg">
+                      🏔️ NORTH BENGAL FOOTHILLS
+                    </span>
+                  </MapMarker>
+
+                  <MapMarker longitude={88.1402} latitude={25.1500} className="pointer-events-none">
+                    <span className="text-[10px] font-bold text-amber-400 bg-slate-950/80 px-2 py-0.5 rounded border border-amber-500/40 tracking-wider shadow-lg">
+                      🏬 MALDA CENTRAL CORRIDOR
+                    </span>
+                  </MapMarker>
+
+                  <MapMarker longitude={86.8500} latitude={23.7500} className="pointer-events-none">
+                    <span className="text-[10px] font-bold text-indigo-300 bg-slate-950/80 px-2 py-0.5 rounded border border-indigo-500/40 tracking-wider shadow-lg">
+                      🏭 ASANSOL INDUSTRIAL BELT
+                    </span>
+                  </MapMarker>
+
+                  <MapMarker longitude={88.3639} latitude={22.4000} className="pointer-events-none">
+                    <span className="text-[10px] font-bold text-blue-300 bg-slate-950/80 px-2 py-0.5 rounded border border-blue-500/40 tracking-wider shadow-lg">
+                      🏛️ KOLKATA APEX METRO
+                    </span>
+                  </MapMarker>
+
+                  {/* MapCN Facility Markers */}
+                  {filteredNodes.map((node) => {
+                    const coords = facilityGeoCoords[node.id] || [88.2, 24.2];
+                    const isCritical = node.status === 'critical';
+                    const isWarning = node.status === 'warning';
+                    const isOptimal = node.status === 'optimal';
+                    const isMasterHub = node.type.includes('Central Warehouse') || node.name.includes('Apex');
+
+                    return (
+                      <MapMarker
+                        key={node.id}
+                        longitude={coords[0]}
+                        latitude={coords[1]}
+                        onClick={() => {
+                          setSelectedNode(node);
+                          setSelectedVehicle(null);
+                        }}
+                        className="group z-30"
+                      >
+                        <div className="relative flex flex-col items-center cursor-pointer">
+                          {isCritical && <span className="absolute -inset-3 rounded-full bg-red-500 opacity-70 animate-ping"></span>}
+                          {isWarning && <span className="absolute -inset-2 rounded-full bg-amber-400 opacity-60 animate-pulse"></span>}
+                          {isMasterHub && <span className="absolute -inset-2.5 rounded-full bg-cyan-400 opacity-50 animate-pulse"></span>}
+
+                          <div
+                            className={`rounded-xl p-2 text-white flex items-center gap-1.5 shadow-2xl border-2 transition-all duration-200 group-hover:scale-125 ${
+                              isMasterHub
+                                ? 'bg-[#00236f] border-cyan-400 text-cyan-300 ring-2 ring-cyan-500/50'
+                                : isCritical
+                                ? 'bg-red-600 border-white text-white ring-2 ring-red-500/50'
+                                : isWarning
+                                ? 'bg-amber-500 border-white text-slate-900 ring-2 ring-amber-500/50'
+                                : 'bg-emerald-600 border-white text-white ring-2 ring-emerald-500/50'
+                            }`}
+                          >
+                            {isMasterHub ? <Building className="w-4 h-4" /> : <MapPin className="w-3.5 h-3.5" />}
+                            <span className="text-[10px] font-bold font-mono">
+                              {node.name.replace('Primary Health Centre', 'PHC').replace('Central State Medical Warehouse', 'Central Wh').replace('Kolkata Apex Medical Institute', 'Kolkata Apex')}
+                            </span>
+                            <span className={`text-[9px] font-bold px-1 py-0.2 rounded ${
+                              isCritical ? 'bg-red-950 text-red-200' : isWarning ? 'bg-amber-950 text-amber-200' : 'bg-emerald-950 text-emerald-200'
+                            }`}>
+                              {node.stockLevelPercent}%
+                            </span>
+                          </div>
+                        </div>
+                      </MapMarker>
+                    );
+                  })}
+
+                  {/* MapCN Moving Fleet Vehicles */}
+                  {(mapLayer === 'fleet' || mapLayer === 'network' || mapLayer === 'coldchain') &&
+                    mockVehicles.map((veh) => {
+                      const coords = vehicleGeoCoords[veh.id] || [88.2, 24.2];
+                      return (
+                        <MapMarker
+                          key={veh.id}
+                          longitude={coords[0]}
+                          latitude={coords[1]}
+                          onClick={() => {
+                            setSelectedVehicle(veh);
+                            setSelectedNode(null);
+                          }}
+                          className="group z-40"
+                        >
+                          <div className="relative flex flex-col items-center cursor-pointer">
+                            <span className="absolute -inset-2 rounded-full bg-cyan-400 opacity-50 animate-ping"></span>
+                            <div className="bg-slate-900 border-2 border-cyan-400 text-cyan-300 p-1.5 rounded-xl shadow-xl flex items-center gap-1.5 hover:scale-125 transition-transform">
+                              <Truck className="w-4 h-4 text-cyan-400" />
+                              <div className="flex flex-col">
+                                <span className="text-[10px] font-bold text-white font-mono leading-none">
+                                  {veh.name.split('#')[0]}
+                                </span>
+                                <span className="text-[9px] font-bold text-emerald-400 font-mono mt-0.5">
+                                  {veh.temp}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </MapMarker>
+                      );
+                    })}
+
+                </MapCNMap>
+              </div>
+            ) : (
+              <>
+                {/* Topographic GIS Vector Canvas */}
+                <svg
+                  className="absolute inset-0 w-full h-full"
+
+
               viewBox="0 0 1000 600"
               preserveAspectRatio="xMidYMid slice"
               xmlns="http://www.w3.org/2000/svg"
@@ -756,8 +967,12 @@ export default function StatewideDashboard({
                 </div>
               </div>
             )}
-          </div>
-        </div>
+          </>
+        )}
+      </div>
+    </div>
+
+
 
         {/* Alerts Side Panel */}
         <div className="bg-white border border-slate-200 rounded-2xl flex flex-col shadow-xs h-[520px] overflow-hidden">
