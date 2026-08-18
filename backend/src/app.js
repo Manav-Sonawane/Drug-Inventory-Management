@@ -45,18 +45,32 @@ const allowedOrigins = [
     'http://localhost:3000',
     'http://127.0.0.1:5173',
     'https://alessandro-necessitous-leandro.ngrok-free.dev',
+    ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
+    ...(process.env.CLIENT_URL ? [process.env.CLIENT_URL] : []),
 ];
 
 app.use(cors({
     origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.ngrok-free.dev') || origin.endsWith('.ngrok-free.app') || origin.endsWith('.ngrok.io')) {
+        if (
+            !origin ||
+            allowedOrigins.includes(origin) ||
+            origin.endsWith('.vercel.app') ||
+            origin.endsWith('.ngrok-free.dev') ||
+            origin.endsWith('.ngrok-free.app') ||
+            origin.endsWith('.ngrok.io')
+        ) {
             callback(null, true);
         } else {
-            callback(null, true); // Allow during development/testing
+            // Allow all origins in production/testing with origin reflection
+            callback(null, true);
         }
     },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
 }));
+app.options('*', cors());
+
 
 // ── Body Parsing ──────────────────────────────────────────────────────────────
 app.use(express.json());
